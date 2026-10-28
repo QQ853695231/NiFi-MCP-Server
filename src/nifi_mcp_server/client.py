@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple, List
+from typing import Any, Callable, Dict, Optional, Tuple, List
 from functools import lru_cache
 
 import requests
@@ -24,12 +24,14 @@ class NiFiError(Exception):
 
 
 class NiFiClient:
-	def __init__(self, base_url: str, session: requests.Session, timeout_seconds: int = 30, proxy_context_path: Optional[str] = None):
+	def __init__(self, base_url: str, session: requests.Session, timeout_seconds: int = 30, proxy_context_path: Optional[str] = None, auth_refresh: Optional[Callable[[], None]] = None):
 		self.base_url = base_url.rstrip("/")
 		self.session = session
 		self.timeout = timeout_seconds
 		self._version_info: Optional[Tuple[int, int, int]] = None
 		self.proxy_context_path = proxy_context_path
+		# Optional re-auth callback invoked once on HTTP 401 (JWT expired mid-session)
+		self.auth_refresh = auth_refresh
 		
 		# Add CDP proxy headers if configured
 		if self.proxy_context_path:
@@ -38,6 +40,19 @@ class NiFiClient:
 	def _url(self, path: str) -> str:
 		return f"{self.base_url}/{path.lstrip('/')}"
 
+	def _request(self, method: str, path: str, params: Optional[Dict[str, Any]] = None, data: Optional[Dict[str, Any]] = None) -> requests.Response:
+		kwargs: Dict[str, Any] = {"timeout": self.timeout}
+		if params is not None:
+			kwargs["params"] = params
+		if data is not None:
+			kwargs["json"] = data
+		resp = self.session.request(method, self._url(path), **kwargs)
+		# JWT expired mid-session: re-authenticate once, then retry the request
+		if resp.status_code == 401 and self.auth_refresh is not None:
+			self.auth_refresh()
+			resp = self.session.request(method, self._url(path), **kwargs)
+		return resp
+
 	@retry(
 		retry=retry_if_exception_type((NiFiError, requests.HTTPError, requests.ConnectionError, requests.Timeout)),
 		wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
@@ -45,7 +60,7 @@ class NiFiClient:
 		reraise=True,
 	)
 	def _get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		resp = self.session.get(self._url(path), params=params, timeout=self.timeout)
+		resp = self._request("GET", path, params=params)
 		if not resp.ok:
 			# Capture detailed error information from NiFi API
 			error_body = resp.text if resp.text else "(empty response)"
@@ -63,7 +78,7 @@ class NiFiClient:
 		reraise=True,
 	)
 	def _put(self, path: str, data: Dict[str, Any]) -> Dict[str, Any]:
-		resp = self.session.put(self._url(path), json=data, timeout=self.timeout)
+		resp = self._request("PUT", path, data=data)
 		if not resp.ok:
 			# Capture detailed error information from NiFi API
 			error_body = resp.text if resp.text else "(empty response)"
@@ -81,7 +96,7 @@ class NiFiClient:
 		reraise=True,
 	)
 	def _post(self, path: str, data: Dict[str, Any]) -> Dict[str, Any]:
-		resp = self.session.post(self._url(path), json=data, timeout=self.timeout)
+		resp = self._request("POST", path, data=data)
 		if not resp.ok:
 			# Capture detailed error information from NiFi API
 			error_body = resp.text if resp.text else "(empty response)"
@@ -99,7 +114,7 @@ class NiFiClient:
 		reraise=True,
 	)
 	def _delete(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-		resp = self.session.delete(self._url(path), params=params, timeout=self.timeout)
+		resp = self._request("DELETE", path, params=params)
 		if not resp.ok:
 			# Capture detailed error information from NiFi API
 			error_body = resp.text if resp.text else "(empty response)"

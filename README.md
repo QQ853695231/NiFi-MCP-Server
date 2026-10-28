@@ -86,6 +86,19 @@ https://<your-nifi-host>/nifi-2-dh/cdp-proxy/nifi-app/nifi-api
 
 Get your Knox JWT token from the CDP UI and use it with the configurations below.
 
+## Docker Deployment
+
+Run the MCP server as an HTTP service — no local Python required:
+
+```bash
+cp .env.example .env    # then edit NIFI_API_BASE / KNOX_TOKEN
+docker compose up -d
+```
+
+The MCP endpoint is exposed at `http://<host>:3030/mcp` (streamable-http, default) or `http://<host>:3030/sse` (`MCP_TRANSPORT=sse`). Claude Desktop can connect via `npx mcp-remote http://<host>:3030/mcp`.
+
+For **fully offline deployment** (build once, transfer the image as a tarball via `docker save`/`docker load`), see [DOCKER.md](DOCKER.md).
+
 ## Setup
 
 ### Option 1: Claude Desktop (Local)
@@ -158,9 +171,15 @@ All configuration is done via environment variables:
 | `KNOX_GATEWAY_URL` | No | Knox gateway URL (alternative to `NIFI_API_BASE`) |
 | `KNOX_COOKIE` | No | Alternative: provide full cookie string instead of token |
 | `KNOX_PASSCODE_TOKEN` | No | Alternative: Knox passcode token (auto-exchanged for JWT) |
+| `NIFI_USERNAME` / `NIFI_PASSWORD` | No | Standalone NiFi (non-Knox) login: auto-exchanges credentials for a JWT at startup and auto-re-logins on expiry |
+| `NIFI_TOKEN` | No | Raw NiFi JWT sent as `Authorization: Bearer` (alternative to username/password) |
+| `NIFI_TOKEN_ENDPOINT` | No | NiFi login endpoint (default: `{NIFI_API_BASE}/access/token`) |
 | `NIFI_READONLY` | No | Read-only mode (default: `true`) |
 | `KNOX_VERIFY_SSL` | No | Verify SSL certificates (default: `true`) |
 | `KNOX_CA_BUNDLE` | No | Path to CA certificate bundle |
+| `MCP_TRANSPORT` | No | MCP transport: `stdio` (default), `sse`, `streamable-http` |
+| `MCP_HOST` | No | Bind address for HTTP transports (default `127.0.0.1`; `0.0.0.0` in Docker) |
+| `MCP_PORT` | No | Bind port for HTTP transports (default: `3030`) |
 
 \* Either `NIFI_API_BASE` or `KNOX_GATEWAY_URL` is required
 

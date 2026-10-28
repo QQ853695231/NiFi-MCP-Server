@@ -1,0 +1,40 @@
+services:
+  nifi-mcp-server:
+    build:
+      context: .
+      args:
+        # 构建时可用: docker compose build --build-arg PIP_INDEX_URL=<mirror>
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    image: nifi-mcp-server:0.8.0
+    container_name: nifi-mcp-server
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${MCP_PORT:-3030}:${MCP_PORT:-3030}"
+    environment:
+      # --- MCP 服务 ---
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-streamable-http}
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: ${MCP_PORT:-3030}
+      # --- NiFi 连接 ---
+      NIFI_API_BASE: ${NIFI_API_BASE:?Set NIFI_API_BASE in .env (see .env.example)}
+      KNOX_GATEWAY_URL: ${KNOX_GATEWAY_URL:-}
+      # --- 认证 ---
+      KNOX_TOKEN: ${KNOX_TOKEN:-}
+      KNOX_COOKIE: ${KNOX_COOKIE:-}
+      KNOX_USER: ${KNOX_USER:-}
+      KNOX_PASSWORD: ${KNOX_PASSWORD:-}
+      KNOX_TOKEN_ENDPOINT: ${KNOX_TOKEN_ENDPOINT:-}
+      KNOX_PASSCODE_TOKEN: ${KNOX_PASSCODE_TOKEN:-}
+      # --- 行为 ---
+      NIFI_READONLY: ${NIFI_READONLY:-true}
+      NIFI_PROXY_CONTEXT_PATH: ${NIFI_PROXY_CONTEXT_PATH:-}
+      # --- TLS ---
+      KNOX_VERIFY_SSL: ${KNOX_VERIFY_SSL:-true}
+      KNOX_CA_BUNDLE: ${KNOX_CA_BUNDLE:-}
+      # --- HTTP ---
+      HTTP_TIMEOUT_SECONDS: ${HTTP_TIMEOUT_SECONDS:-30}
+      HTTP_MAX_RETRIES: ${HTTP_MAX_RETRIES:-3}
+    volumes:
+      # 自定义 CA 证书：把证书放到 ./certs/ca-bundle.crt 并设置 KNOX_CA_BUNDLE=/certs/ca-bundle.crt
+      - ${KNOX_CA_BUNDLE_DIR:-./certs}:/certs:ro

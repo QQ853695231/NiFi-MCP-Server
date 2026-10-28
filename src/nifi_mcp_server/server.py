@@ -16,12 +16,17 @@ from .setup_helper import SetupGuide
 
 # Lazy import of MCP to give a clear error if the dependency is missing
 try:
-	from mcp.server import FastMCP
-	from mcp.server.stdio import stdio_server
+    try:  # mcp >= 1.1.2 uses fastmcp
+        from mcp.server.fastmcp import FastMCP
+    except ImportError:
+        try:  # mcp 2.x renamed FastMCP to MCPServer
+            from mcp.server.mcpserver import MCPServer as FastMCP
+        except ImportError:  # pragma: no cover - fallback for older mcp layouts
+            from mcp.server import FastMCP
 except Exception as e:  # pragma: no cover
-	raise RuntimeError(
-		"The 'mcp' package is required. Install with: pip install mcp"
-	) from e
+    raise RuntimeError(
+        "The 'mcp' package is required. Install with: pip install 'mcp<2'"
+    ) from e
 
 
 def _redact_sensitive(obj: Any, max_items: int = 200) -> Any:
@@ -56,18 +61,32 @@ def build_client(config: ServerConfig) -> NiFiClient:
 		token_endpoint=config.knox_token_endpoint,
 		passcode_token=config.knox_passcode_token,
 		verify=verify,
+		nifi_api_base=config.nifi_api_base,
+		nifi_token=config.nifi_token,
+		nifi_username=config.nifi_username,
+		nifi_password=config.nifi_password,
+		nifi_token_endpoint=config.nifi_token_endpoint,
 	)
-	session = auth.build_session()
+	# session + optional refresh callback (re-login on 401 with NIFI_USERNAME/NIFI_PASSWORD)
+	session, auth_refresh = auth.build_session_with_refresh()
 	return NiFiClient(
 		nifi_base,
 		session,
 		timeout_seconds=config.timeout_seconds,
 		proxy_context_path=config.proxy_context_path,
+		auth_refresh=auth_refresh,
 	)
 
 
-def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
-	app = FastMCP("nifi-mcp-server")
+def create_server(nifi: NiFiClient, readonly: bool, host: Optional[str] = None, port: Optional[int] = None) -> FastMCP:
+	# host/port feed FastMCP settings so sse / streamable-http transports
+	# bind to the configured address instead of the SDK default 127.0.0.1:8000.
+	settings_kwargs: Dict[str, Any] = {}
+	if host:
+		settings_kwargs["host"] = host
+	if port:
+		settings_kwargs["port"] = port
+	app = FastMCP("nifi-mcp-server", **settings_kwargs)
 
 	@app.tool()
 	async def get_nifi_version() -> Dict[str, Any]:
@@ -739,28 +758,28 @@ def create_server(nifi: NiFiClient, readonly: bool) -> FastMCP:
 	return app
 
 
-async def run_stdio() -> None:
-	# For FastMCP, prefer the built-in stdio runner
+def build_server() -> FastMCP:
+	"""Build the MCP server from environment configuration."""
 	config = ServerConfig()
 	nifi = build_client(config)
-	server = create_server(nifi, readonly=config.readonly)
+	# Wire MCP_HOST/MCP_PORT through so sse / streamable-http actually bind to them
+	return create_server(nifi, readonly=config.readonly, host=config.host, port=config.port)
+
+
+async def run_stdio() -> None:
+	# For FastMCP, prefer the built-in stdio runner
 	# run() is synchronous; call the async flavor directly
-	await server.run_stdio_async()
+	await build_server().run_stdio_async()
 
 
 def main() -> None:
 	transport = os.getenv("MCP_TRANSPORT", "stdio").lower()
 	if transport != "stdio":
-		# Defer to FastMCP synchronous run helper for other transports when added
-		config = ServerConfig()
-		nifi = build_client(config)
-		server = create_server(nifi, readonly=config.readonly)
-		server.run(transport=transport)
+		# sse / streamable-http: bind to MCP_HOST:MCP_PORT (0.0.0.0:3030 in Docker)
+		build_server().run(transport=transport)
 		return
 	anyio.run(run_stdio)
 
 
 if __name__ == "__main__":
 	main()
-
-

@@ -87,12 +87,19 @@ class SetupGuide:
         knox_cookie = os.getenv("KNOX_COOKIE")
         knox_user = os.getenv("KNOX_USER")
         knox_password = os.getenv("KNOX_PASSWORD")
+        nifi_token = os.getenv("NIFI_TOKEN")
+        nifi_username = os.getenv("NIFI_USERNAME")
+        nifi_password = os.getenv("NIFI_PASSWORD")
         
-        has_auth = any([knox_token, knox_cookie, (knox_user and knox_password)])
+        has_auth = any([
+            knox_token, knox_cookie, (knox_user and knox_password),
+            nifi_token, (nifi_username and nifi_password),
+        ])
         
         if not has_auth:
             warnings.append("⚠️  No authentication configured (requests will fail if auth is required)")
-            warnings.append("   Recommended: Set KNOX_TOKEN for CDP NiFi")
+            warnings.append("   Recommended for CDP NiFi: Set KNOX_TOKEN")
+            warnings.append("   Recommended for standalone NiFi: Set NIFI_USERNAME / NIFI_PASSWORD")
             warnings.append("   Example: export KNOX_TOKEN='eyJqa3UiOi...'")
         
         # Check SSL verification

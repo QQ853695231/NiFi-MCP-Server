@@ -26,6 +26,12 @@ class ServerConfig:
 	# Optional passcode token (e.g., Livy/Knox) for alternate auth patterns
 	knox_passcode_token: Optional[str] = os.getenv("KNOX_PASSCODE_TOKEN")
 
+	# Standalone (non-Knox) NiFi auth: static JWT or username/password login
+	nifi_token: Optional[str] = os.getenv("NIFI_TOKEN")
+	nifi_username: Optional[str] = os.getenv("NIFI_USERNAME")
+	nifi_password: Optional[str] = os.getenv("NIFI_PASSWORD")
+	nifi_token_endpoint: Optional[str] = os.getenv("NIFI_TOKEN_ENDPOINT")
+
 	# TLS/HTTP
 	verify_ssl_env: str = os.getenv("KNOX_VERIFY_SSL", "true").lower()
 	ca_bundle: Optional[str] = os.getenv("KNOX_CA_BUNDLE")

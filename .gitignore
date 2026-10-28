@@ -1,0 +1,17 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# IDE
+.idea/
+
+# Secrets / local env
+.env
+
+# Docker offline image tarballs
+*.tar
