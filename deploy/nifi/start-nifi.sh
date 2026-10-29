@@ -26,6 +26,9 @@ SITE_TO_SITE_PORT="10000"
 # 宿主机数据目录（conf/日志/state/仓库/敏感密钥全在这里）
 DATA_DIR="/opt/tools/nifi/nifi-data"
 
+# 自定义数据库驱动目录（用于存放 JDBC 驱动等）
+CUSTOM_DRIVERS_DIR="${DATA_DIR}/custom_drivers"
+
 # 单用户登录账号（NIFI_UI_USERNAME 留空 = 首次启动随机生成，用 docker logs 查看）
 NIFI_UI_USERNAME="admin"
 NIFI_UI_PASSWORD="NiFiAdmin123456"    # 必须 ≥12 位
@@ -54,6 +57,7 @@ VOL_DIRS=(
   "provenance_repository" # 数据溯源
   "python_extensions"     # 2.x Python 扩展
   "nar_extensions"        # 自定义 NAR 扩展
+  "custom_drivers"        # 自定义数据库驱动等
 )
 
 info()  { echo -e "\033[32m[INFO]\033[0m $*"; }
@@ -162,6 +166,7 @@ else
   info "随机账号: docker logs ${CONTAINER_NAME} | grep Generated"
 fi
 info "日志:     docker logs -f ${CONTAINER_NAME}"
+info "自定义驱动: ${CUSTOM_DRIVERS_DIR}"
 echo
 info "配套的 nifi-mcp-server 环境变量（写入其 .env 即可对接）："
 echo "  NIFI_API_BASE=https://${PUBLIC_HOST}:${HTTPS_PORT}/nifi-api"

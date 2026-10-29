@@ -469,12 +469,51 @@ class NiFiClient:
 		version: int,
 		config: Dict[str, Any]
 	) -> Dict[str, Any]:
-		"""Update processor configuration. Requires NIFI_READONLY=false."""
+		"""Update processor configuration. Requires NIFI_READONLY=false.
+		
+		Args:
+			processor_id: The processor ID
+			version: The current revision version
+			config: Configuration dict. Can be:
+				- {"properties": {"key": "value"}} - just properties to update
+				- {"id": "...", "properties": {...}} - full component config
+				- {"id": "...", "component": {"properties": {...}}} - nested (legacy)
+				
+		Returns:
+			Updated processor configuration from NiFi API.
+		"""
+		# Normalize config structure
+		component = {}
+		
+		# Case 1: User passed {"properties": {...}} directly
+		if "properties" in config and len(config) == 1:
+			component = {"id": processor_id, "properties": config["properties"]}
+		
+		# Case 2: User passed {"id": "...", "properties": {...}}
+		elif "properties" in config and "id" in config:
+			component = config
+		
+		# Case 3: User passed nested {"component": {...}} (legacy/incorrect format)
+		elif "component" in config:
+			component = config["component"]
+			if "id" not in component:
+				component["id"] = processor_id
+		
+		# Case 4: User passed full component directly
+		else:
+			component = config
+			if "id" not in component:
+				component["id"] = processor_id
+		
+		# Ensure properties exists as a dict
+		if "properties" not in component:
+			component["properties"] = {}
+		
 		return self._put(
 			f"processors/{processor_id}",
 			{
 				"revision": {"version": version},
-				"component": config
+				"component": component
 			}
 		)
 	
@@ -851,5 +890,3 @@ class NiFiClient:
 			f"processors/{processor_id}/threads",
 			params={"version": version}
 		)
-
-

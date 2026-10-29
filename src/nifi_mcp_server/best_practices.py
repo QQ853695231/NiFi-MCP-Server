@@ -136,7 +136,7 @@ Correct order for building flows:
    create_processor(pg_id, "org.apache.nifi.processors...", "Processor Name")
 
 5. Configure Processors
-   update_processor_config(processor_id, version, properties={...})
+   update_processor_config(processor_id, version, {"properties": {"key": "value"}})
 
 6. Create Connections
    create_connection(pg_id, source_id, dest_id, ["success"])
@@ -302,7 +302,7 @@ Correct startup sequence:
 4️⃣  BUILD YOUR FLOW
     
     - Create processors: create_processor(pg_id, processor_type, name)
-    - Configure processors: update_processor_config(processor_id, version, properties)
+    - Configure processors: update_processor_config(processor_id, version, {"properties": {...}})
     - Connect processors: create_connection(pg_id, source_id, dest_id, relationships)
 
 5️⃣  START YOUR FLOW
@@ -376,4 +376,3 @@ class SmartFlowBuilder:
     def get_current_process_group(self) -> Optional[str]:
         """Get current process group ID."""
         return self.current_process_group
-
